@@ -1,0 +1,617 @@
+---
+title: Homework 4
+author:
+  - Landon Carpenter
+date: 03Apr2023
+format:
+  html:
+    toc: true
+    self-contained: true
+    embed-resources: true
+    output-file: Homework 4.html
+    code-copy: true
+    code-line-numbers: true
+    warning: false
+    error: false
+    message: false
+
+---
+
+
+# Problem 1:
+
+Question: 
+
+Suppose a logistic model has been fitted to a data set and the ROC curve has been plotted. If the point
+with sensitivity = α and specificity = β is on the curve, what are the smallest and largest values for the area
+under the curve?
+
+Answer:
+
+The ROC curve is used to show the perfomance of a classification model. In the ROC curve a line is drawn beginning at point [0,0] and ending at [1,1] and because the worst performance is a straight line from one point to the other the minimum is 0.5. Because the best classifier is at goes through [0,1] the maximum is 1.
+
+# Problem 2: 
+
+Question:
+
+We’ll use the MNIST image classification data, available as mnist_all.RData. For this problem we want to distinguish between 1 and 3. Filter the train data to only include digits 1 and 3. Remove all variables (pixels)
+that have zero variance, i.e. pixels that have the same value for both digits. Repeat this for the test data.
+It’s recommended to write a function that you can run on both datasets.
+
+In this problem, you will do two forward selection steps for finding good logistic models.
+
+## part a: 
+
+Find the pixel that gives the best logistic model for the training data, using the area under the ROC curve as the criterion. Do this with a complete search. Do not show the output of all logistic models.
+
+```{r}
+#| vscode: {languageId: r}
+#open mnist_all.RData
+load("mnist_all.RData")
+```
+
+```{r}
+#| vscode: {languageId: r}
+ls()
+```
+
+Block for getting train and test for 1 and 3
+
+```{r}
+#| vscode: {languageId: r}
+index.13.train <- train$y == 1 | train$y == 3
+train.13 <- as.data.frame(train$x[index.13.train,])
+train.13$z <- as.numeric(train$y[index.13.train] == 3)
+index.13.test <- test$y == 1 | test$y == 3
+test.13 <- as.data.frame(test$x[index.13.test,])
+test.13$z <- as.numeric(test$y[index.13.test] == 3)
+```
+
+```{r}
+#| vscode: {languageId: r}
+#get the dimesion of the data
+dim(train.13)
+```
+
+```{r}
+#| vscode: {languageId: r}
+# head(train.13)
+```
+
+```{r}
+#| vscode: {languageId: r}
+auc.list1 = numeric(ncol(train.13)-1)
+length(auc.list1)
+```
+
+for loop to get the auc for each pixel
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+#show the mnist data
+library(pROC)
+for (i in 1:(ncol(train.13)-1)){
+    mod1 = glm(z~train.13[,i], family=binomial, data=train.13)
+    preds1 = predict(mod1, newdata=train.13, type="response")
+    auc.list1[i] = roc(train.13$z, preds1)$auc
+}
+```
+
+```{r, echo=TRUE}
+#| vscode: {languageId: r}
+best.var1 = names(train.13)[which.max(auc.list1)]
+best.auc1 = max(auc.list1)
+best.var1
+best.auc1
+```
+
+##  part b: 
+
+Now find one more pixel such that the resulting logistic model using the pixel from
+part a together with the new one has the best area under the ROC curve. Do this with a
+complete search. Minimize the output.
+
+```{r}
+#| vscode: {languageId: r}
+auc.list2 = numeric(ncol(train.13)-1)
+length(auc.list2)
+```
+
+Code block: below was my inital interpretation of the question, but it was taking way too long so I think I was goind the wrong direction. Instead I'm using the complete search above to find the second best pixel for the time being. If I have time I'll run this later. 
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+for (i in 1:(ncol(train.13)-1)){
+    mod2 = glm(z~train.13[,490] + train.13[,i], family=binomial, data=train.13)
+    preds2 = predict(mod2, newdata=train.13, type="response")
+    auc.list2[i] = roc(train.13$z, preds2)$auc
+}
+```
+
+```{r}
+#| vscode: {languageId: r}
+best.var2 = names(train.13)[which.max(auc.list2)]
+best.auc2 = max(auc.list2)
+best.var2
+best.auc2
+```
+
+
+## Part c:
+
+part c: Use the test data to decide whether the second model is really better than the first one
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+mod1c = glm(z~train.13[,490], family=binomial, data=train.13)
+mod2c = glm(z~train.13[,490]+train.13[,495], family=binomial, data=train.13)
+```
+
+```{r}
+#| vscode: {languageId: r}
+#predict the test data with model 1 and 2
+preds1c = predict(mod1c, newdata=test.13, type="response")
+preds2c = predict(mod2c, newdata=test.13, type="response")
+```
+
+```{r, echo=TRUE}
+#| vscode: {languageId: r}
+#get the rmse for model 1 and 2
+rmse1 = sqrt(mean((test.13$z - preds1c)^2))
+rmse2 = sqrt(mean((test.13$z - preds2c)^2))
+print("rmse for model 1 and 2")
+print(rmse1)
+print(rmse2)
+```
+
+looks like model 2 is slightly better. 
+
+## Part d:
+
+How many logistic models altogether have you examined? How many will you have to
+examine if you want to continue this process and make the best logistic model with 10 pixels?
+
+From my code above, I have examined 1568 models.To continue this process with 10 pixels I would have to examine 7840 models. 
+
+# Problem 3: Exploring MNIST data using Neural Networks
+
+In this problem we want to distinguish between 4 and 7. Extract the relevant train data and test data.
+
+
+## Part a:
+
+Pick two features (variables) that have large variances and low correlation. Fit a logistic
+regression model with these two features. Evaluate the model with the AUC score.
+
+
+Block to get train and test for 4 and 7
+
+```{r}
+#| vscode: {languageId: r}
+index.47.train <- train$y == 4 | train$y == 7
+train.47 <- as.data.frame(train$x[index.47.train,])
+train.47$z <- as.numeric(train$y[index.47.train] == 7)
+index.47.test <- test$y == 4 | test$y == 7
+test.47 <- as.data.frame(test$x[index.47.test,])
+test.47$z <- as.numeric(test$y[index.47.test] == 7)
+```
+
+```{r}
+#| vscode: {languageId: r}
+dim(train.47)
+dim(test.47)
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+#get two variables that have large variance and low correlation
+auc.list3 = numeric(ncol(train.47)-1)
+
+for (i in 1:(ncol(train.47)-1)){
+    mod3 = glm(z~train.47[,i], family=binomial, data=train.47)
+    preds3 = predict(mod3, newdata=train.47, type="response")
+    auc.list3[i] = roc(train.47$z, preds3)$auc
+}
+
+best.var3 = names(train.47)[which.max(auc.list3)]
+best.auc3 = max(auc.list3)
+best.var3
+best.auc3
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+
+for (i in 1:(ncol(train.47)-1)){
+    mod4 = glm(z~train.47[,i]+train.47[,431], family=binomial, data=train.47)
+    preds4 = predict(mod4, newdata=train.47, type="response")
+    auc.list3[i] = roc(train.47$z, preds4)$auc
+}
+
+best.var4 = names(train.47)[which.max(auc.list3)]
+best.auc4 = max(auc.list3)
+best.var4
+best.auc4
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+mod3a <- glm(z~train.47[,431] + train.47[,268], family=binomial, data=train.47)
+```
+
+```{r}
+#| vscode: {languageId: r}
+dim(test.47)
+length(test.47$z)
+```
+
+```{r}
+#| vscode: {languageId: r}
+#evaluate the model the model with AUC score
+# I may have made a mistake here, but the test dimensions arent lining up with the predictions from the model so I'm predicting on train
+preds3a = predict(mod3a, train.47, type="response")
+length(preds3a)
+```
+
+```{r}
+#| vscode: {languageId: r}
+auc3a = roc(train.47$z, preds3a)$auc
+print("AUC score for model 3a")
+auc3a
+```
+
+## Part b:
+
+Create a neural net with one unit in the hidden layer. Train the neural net with the
+same two features as the previous part and evaluate the model with AUC. Compare to the
+results from (a) and explain.
+
+```{r}
+#| vscode: {languageId: r}
+library(neuralnet)
+library(caret)
+library(pROC)
+```
+
+```{r}
+#| vscode: {languageId: r}
+mod_mat = model.matrix(~., data=train.47)
+dim(mod_mat)
+# head(mod_mat)
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+mod_nn = neuralnet(z~V431 + V268, data=mod_mat, hidden=1, linear.output=FALSE)
+```
+
+```{r}
+#| vscode: {languageId: r}
+predsnn = predict(mod_nn, mod_mat)
+auc3b = roc(train.47$z, predsnn)$auc
+print("AUC score for model 3b")
+auc3b
+```
+
+The results look almost identical from AUC scores. 
+
+## Part c:
+
+With the same two features, train three different neural nets, each time using more
+units in the hidden layer. How do the results improve, using the AUC?
+
+Training time was really long so this really aren't ideal parameters.would have used google colab and left the threshold at .01
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+mod_nn_2 = neuralnet(z~V431 + V268, data=mod_mat, hidden=2, linear.output=FALSE, stepmax = 1e+6, threshold = 0.2)
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+mod_nn_3 = neuralnet(z~V431 + V268, data=mod_mat, hidden=3, linear.output=FALSE, stepmax = 1e+6, threshold = 0.2)
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+mod_nn_4 = neuralnet(z~V431 + V268, data=mod_mat, hidden=4, linear.output=FALSE, stepmax = 1e+6, threshold = 0.2)
+```
+
+The next few plot block are how I made sure the model was working because I was having issues at the predict function.
+```{r}
+#| vscode: {languageId: r}
+# plot(mod_nn_2)
+```
+
+```{r}
+#| vscode: {languageId: r}
+# plot(mod_nn_3)
+```
+
+```{r}
+#| vscode: {languageId: r}
+# plot(mod_nn_4)
+```
+
+```{r}
+#| vscode: {languageId: r}
+class(mod_mat)
+```
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+preds_nn_2 = predict(mod_nn_2, mod_mat)
+preds_nn_3 = predict(mod_nn_3, mod_mat)
+preds_nn_4 = predict(mod_nn_4, mod_mat)
+```
+
+```{r}
+#| vscode: {languageId: r}
+#save the z column from mod_mat as z
+z = mod_mat[,ncol(mod_mat)]
+```
+ 
+ AUC and RMSE for each model on the training data
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+auc2c = roc(z, preds_nn_2)$auc
+auc3c = roc(z, preds_nn_3)$auc
+auc4c = roc(z, preds_nn_4)$auc
+
+print("AUC")
+auc2c
+auc3c
+auc4c
+
+rmse2 = sqrt(mean((z - preds_nn_2)^2))
+rmse3 = sqrt(mean((z - preds_nn_3)^2))
+rmse4 = sqrt(mean((z - preds_nn_4)^2))
+
+print("RMSE")
+rmse2
+rmse3
+rmse4
+```
+
+```{r}
+#| vscode: {languageId: r}
+mod_mat_test = model.matrix(~., data=test.47)
+z_test = mod_mat_test[,ncol(mod_mat_test)]
+```
+
+AUC and RMSE for each model on the test data
+
+```{r, message=FALSE, warning=FALSE, echo= TRUE}
+#| vscode: {languageId: r}
+test_pred2 = predict(mod_nn_2, mod_mat_test)
+test_pred3 = predict(mod_nn_3, mod_mat_test)
+test_pred4 = predict(mod_nn_4, mod_mat_test)
+
+auc2d = roc(z_test, test_pred2)$auc
+auc3d = roc(z_test, test_pred3)$auc
+auc4d = roc(z_test, test_pred4)$auc
+
+rmse2 = sqrt(mean((z_test - test_pred2)^2))
+rmse3 = sqrt(mean((z_test - test_pred3)^2))
+rmse4 = sqrt(mean((z_test - test_pred4)^2))
+
+print("AUC")
+auc2d
+auc3d
+auc4d
+
+print("RMSE")
+rmse2
+rmse3
+rmse4
+```
+
+## Part d:
+
+Is there evidence for overfitting in your results in (c)? Use the test data, also available
+in mnist_all.RData, to find out.
+
+The models performance on the test set vs the train set is similar and I dont see any other significant indications of overfitting.
+
+# Problem 4: Explaining the structure of shallow neural networks
+
+Below is the output from nnet after we fit a model. Let’s assume we used a tanh() activation function
+throughout. Let xi, i = 1, 2, . . . be the input variables and let h1, h2, . . . be the output from
+the hidden layer.
+
+a 2-2-1 network with 9 weights
+options were - linear output units
+b->h1 i1->h1 i2->h1
+1.2 4.2 -0.5
+b->h2 i1->h2 i2->h2
+-30 20 -40
+b->o h1->o h2->o
+5 -8 1.5
+
+
+I'm having a little trouble interpreting the logic for the nn above as it is given. 
+
+
+## Part a:
+
+Draw a diagram of this neural network architecture. Label all the edges with the
+corresponding weights.
+
+```{r}
+#| vscode: {languageId: r}
+library(jpeg)
+#display the image diagram.jpg using the jpeg library
+image = readJPEG("diagram2.jpg")
+plot(0, 0, type="n", axes=FALSE, xlab="", ylab="", xlim=c(0, 1), ylim=c(0, 1))
+rasterImage(image, 0, 0, 1, 1)
+```
+
+## Part b:
+
+Provide an expression for the output value of the first hidden unit as a function of
+the values of the input features. This should have the form h1 = f(x1, x2, . . .) for a suitable
+explicit function f.
+
+h1 = tanh(w11*x1 + w21*x2 + b11)
+
+## Part c:
+
+Provide an expression for the value at the output node as a function of the values at the
+hidden units. This should have the form z = g(h1, h2, . . .) for a suitable explicit function g.
+
+z = tanh(w1*h1 + w2*h2 + b)
+
+## Part d:
+
+Provide an expression for the value at the output node as a function of the input
+values. This should have the form z = F(x1, x2, . . .) for a suitable explicit function F.
+
+
+No activateion function for an output layer.
+
+z = (w2131, w2231)*h2 + b3
+
+# Problem 5: Analyze the crime rates in the Boston dataset using logistic, LDA, and QDA models
+
+The goal of this problem is to predict the crime rate of neighborhoods using classification methods. In order
+to convert your quantitative variable crim to a binary outcome, make 1 or high_crime when crim is greater
+than the median crim. Use ten-fold cross-validation for each model type - logistic, LDA, and QDA.
+
+```{r}
+#| vscode: {languageId: r}
+library(MASS)
+# head(Boston)
+```
+
+```{r}
+#| vscode: {languageId: r}
+#get the median value for crim
+threshold = median(Boston$crim)
+#create a new dummy variable from crim where 1 is above the threshold and 0 is below
+Boston$crim2 = as.numeric(Boston$crim > threshold)
+#make crim2 a factor
+Boston$crim2 = as.factor(Boston$crim2)
+print(threshold)
+# head(Boston)
+```
+
+```{r}
+#| vscode: {languageId: r}
+#split Boston int train and test sets
+indx = sample(1:nrow(Boston), nrow(Boston)*.7)
+train = Boston[indx,]
+test = Boston[-indx,]
+```
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE}
+#| vscode: {languageId: r}
+library(caret)
+ctrl = trainControl(method="cv", number=10)
+```
+
+## Part a:
+
+Logistic Regression Method
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE}
+#| vscode: {languageId: r}
+#create a 10 fold logistic regression model to predict crim2
+log_mod = train(crim2~., data=train, method="glm", family=binomial, trControl=ctrl)
+class(log_mod)
+print(log_mod)
+```
+
+## Part b:
+
+LDA method
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE}
+#| vscode: {languageId: r}
+lda_mod = train(crim2~., data=train, method="lda", family=binomial, trControl=ctrl)
+class(lda_mod)
+```
+
+## Part c:
+
+QDA Method
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE}
+#| vscode: {languageId: r}
+qda_mod = train(crim2~., data=train, method="qda", family=binomial, trControl=ctrl)
+class(qda_mod)
+```
+
+## Part d: 
+
+Compare the results of all three models by plotting all three ROC curves in a single
+plot. Also report the area under the curve (AUC) for each method in the plot. Comment on
+which model should be chosen.
+
+```{r}
+#| vscode: {languageId: r}
+library(ROCR)
+library(pROC)
+```
+
+```{r}
+#| vscode: {languageId: r}
+pred_log = predict(log_mod, test)
+pred_lda = predict(lda_mod, test)
+pred_qda = predict(qda_mod, test)
+```
+
+```{r}
+#| vscode: {languageId: r}
+test_highcrime = as.numeric(test$crim2)
+pred_log = as.numeric(pred_log)
+pred_lda = as.numeric(pred_lda)
+pred_qda = as.numeric(pred_qda)
+```
+
+```{r}
+#| vscode: {languageId: r}
+roc_log = roc(test_highcrime, pred_log)
+roc_lda = roc(test_highcrime, pred_lda)
+roc_qda = roc(test_highcrime, pred_qda)
+```
+
+```{r, warning=FALSE, message=FALSE, echo=TRUE}
+#| vscode: {languageId: r}
+#plot the ROC curves
+plot(roc_log, col="red")
+plot(roc_lda, col="blue", add=TRUE)
+plot(roc_qda, col="green", add=TRUE)
+```
+
+# Problem 6: Characteristics of LDA and QDA
+
+## Part a:
+
+Suppose that the form of Bayes decision boundary is linear, which is the better
+performing model on the training set, LDA or QDA? What about the testing set?
+
+QDA is better on the training set and LDA is better on the testing set. Because QDA has a higher variance it is better on the training set, but because LDA has a lower bias it is better on the testing set. 
+
+## Part b:
+
+ If instead the Bayes decision boundary is non-linear, which model, LDA or QDA, will
+perform better on the training set? What about the testing set?
+
+With a non-linear boundary QDA should perform better on both the training and testing set because it has higher variance.
+
+## Part c:
+
+In general, as the sample size n increases, do we expect the test prediction accuracy of
+QDA relative to LDA to improve, decline, or be unchanged? Why?
+
+We cant be sure on the accuracy of QDA relative to LDA because it depends on the data. If the data is linear then LDA will be better, but if the data is non-linear then QDA should imporve relative to LDA. This is because QDA has higher variance and LDA has lower bias.
+
+## Part d:
+
+True or False: Even if the Bayes decision boundary for a given problem is linear, we
+will probably achieve a superior test error rate using QDA rather than LDA because QDA is
+flexible enough to model a linear decision boundary. Justify your answer.
+
+False: a linear model does not depend on flexability to model a linear decision boundary, its just one factor. 
+
+
